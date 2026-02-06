@@ -1,0 +1,35 @@
+# Entornos Virtuales
+.venv/
+venv/
+env/
+bin/
+
+# Python - Archivos compilados y caché
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Seguridad y Configuración (¡Muy importante!)
+.env
+secretos.json
+*.key
+*.pem
+
+# Bases de Datos y Datos
+*.sqlite3
+*.db
+/data/
+/db/
+# Si usas PostgreSQL y exportas datos:
+*.sql
+*.dump
+
+# Logs (Evita subir logs de auth.log o logs de apps)
+*.log
+logs/
+
+# Archivos de sistema y editores
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db
