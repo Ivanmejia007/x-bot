@@ -6,24 +6,24 @@ Este proyecto es un sistema automatizado de **ETL (Extract, Transform, Load)** y
 
 ## 🛠️ Tecnologías y Herramientas
 
-* [cite_start]**Lenguaje:** Python 3.x 
-* [cite_start]**Base de Datos:** PostgreSQL (psycopg2) 
-* [cite_start]**APIs:** * Twitter API v2 (Tweepy) 
-    * [cite_start]Telegram Bot API (python-telegram-bot) 
-* [cite_start]**Entorno:** Python-dotenv para gestión de credenciales 
+* **Lenguaje:** Python 3.x 
+* **Base de Datos:** PostgreSQL (psycopg2) 
+* **APIs:** * Twitter API v2 (Tweepy) 
+    * Telegram Bot API (python-telegram-bot) 
+* **Entorno:** Python-dotenv para gestión de credenciales 
 
 ## 🏗️ Arquitectura del Sistema
 
-1.  **Ingesta (Telegram):** El script `telegrambot.py` recibe mensajes, los procesa y los inserta en la base de datos. [cite_start]Solo el usuario autorizado (definido por ID) puede añadir frases. 
-2.  **Base de Datos:** Estructura relacional que vincula frases con autores y categorías. [cite_start]Incluye un sistema de control para no repetir publicaciones (`publicado = FALSE`). 
-3.  [cite_start]**Publicación (Twitter):** El script `bot_db.py` selecciona una frase aleatoria, verifica que no exceda los 280 caracteres, le añade un "remate" según su categoría y la publica. 
+1.  **Ingesta (Telegram):** El script `telegrambot.py` recibe mensajes, los procesa y los inserta en la base de datos. Solo el usuario autorizado (definido por ID) puede añadir frases. 
+2.  **Base de Datos:** Estructura relacional que vincula frases con autores y categorías. Incluye un sistema de control para no repetir publicaciones (`publicado = FALSE`). 
+3.  **Publicación (Twitter):** El script `bot_db.py` selecciona una frase aleatoria, verifica que no exceda los 280 caracteres, le añade un "remate" según su categoría y la publica. 
 
 ## 📁 Estructura del Proyecto
 
-* [cite_start]`bot_db.py`: Gestiona la lógica de selección y publicación en X. 
-* [cite_start]`telegrambot.py`: Gestiona la recepción de datos vía Telegram. 
-* [cite_start]`requirements.txt`: Lista de dependencias del proyecto. 
-* [cite_start]`.env`: Archivo (protegido) con tokens de acceso y URLs de conexión. 
+* `bot_db.py`: Gestiona la lógica de selección y publicación en X. 
+* `telegrambot.py`: Gestiona la recepción de datos vía Telegram. 
+* `requirements.txt`: Lista de dependencias del proyecto. 
+* `.env`: Archivo (protegido) con tokens de acceso y URLs de conexión. 
 
 ## 🚀 Configuración
 
