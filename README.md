@@ -29,24 +29,24 @@ Este proyecto es un sistema automatizado de **ETL (Extract, Transform, Load)** y
 
 ### 1. Instalación de Dependencias
 
-bash
-pip install -r requirements.txt
+    bash
+    pip install -r requirements.txt
 
 
 ### 2. Variables de Entorno (.env)
 Crea un archivo .env en la raíz con las siguientes variables:
-#### Twitter Keys
-AK='tu_consumer_key'
-AKS='tu_consumer_secret'
-AT='tu_access_token'
-ATS='tu_access_token_secret'
+    # Twitter Keys
+    AK='tu_consumer_key'
+    AKS='tu_consumer_secret'
+    AT='tu_access_token'
+    ATS='tu_access_token_secret'
 
-#### Telegram Config
-TTOKEN='tu_telegram_bot_token'
-TELEGRAMID='tu_id_de_usuario'
+    # Telegram Config
+    TTOKEN='tu_telegram_bot_token'
+    TELEGRAMID='tu_id_de_usuario'
 
-#### Database URL
-DB_URL='postgresql://usuario:password@localhost:5432/nombre_db'
+    # Database URL
+    DB_URL='postgresql://usuario:password@localhost:5432/nombre_db'
 
 ## MODO DE USO.
 Carga de Datos (Telegram)

@@ -97,8 +97,8 @@ if __name__ == "__main__":
         intento = publicar_frase()
         if intento:
             print("Publicación completada. Esperando para la siguiente...")
-            time.sleep(1200)  # Espera 1.5 horas antes de la siguiente publicación
+            time.sleep(5400)  # Espera 1.5 horas antes de la siguiente publicación
         else:
             print("No se publicó ninguna frase. Reintentando en 30 minutos...")
-            time.sleep(600)  # Espera 30 minutos si no se publicó ninguna frase
+            time.sleep(600)  # Espera 10 minutos si no se publicó ninguna frase
         
