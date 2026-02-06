@@ -35,6 +35,7 @@ Este proyecto es un sistema automatizado de **ETL (Extract, Transform, Load)** y
 
 ### 2. Variables de Entorno (.env)
 Crea un archivo .env en la raíz con las siguientes variables:
+
     # Twitter Keys
     AK='tu_consumer_key'
     AKS='tu_consumer_secret'
