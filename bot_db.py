@@ -21,11 +21,11 @@ def obtener_frase_db():
         cur = conn.cursor()
         
         query = """
-        SELECT f.id, f.frase, a.nombre, f.libro, c.id
+        SELECT f.id, f.frase, a.nombre, l.titulo, ac.categoria_id
         FROM frases f
         JOIN autores a ON f.autor_id = a.id
-        JOIN autor_categorias ac ON a.id = ac.autor_id
-        JOIN categorias c ON ac.categoria_id = c.id
+        LEFT JOIN libros l ON f.libro_id = l.id
+        LEFT JOIN autor_categorias ac ON a.id = ac.autor_id
         WHERE f.publicado = FALSE 
         ORDER BY RANDOM() 
         LIMIT 1;
@@ -101,4 +101,4 @@ if __name__ == "__main__":
         else:
             print("No se publicó ninguna frase. Reintentando en 30 minutos...")
             time.sleep(600)  # Espera 10 minutos si no se publicó ninguna frase
-            
+
