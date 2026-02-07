@@ -27,7 +27,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="👋 ¡Hola! Envía frases en el formato:\n\n Autor | Frase | Libro | Categoria |"
+        text="👋 ¡Hola! Envía frases en el formato:\n\n Autor : Libro : Categoria(opcional) : Frase"
     )
 
 async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -37,49 +37,51 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     texto = update.message.text
-    partes = texto.split('|')
+    partes = [p.strip() for p in texto.split(':') if p.strip()]
     if len(partes) < 2: 
-        await update.message.reply_text("⚠️ Formato incorrecto. Usa: Autor | Frase | Libro")
+        await update.message.reply_text("⚠️ Formato incorrecto. Usa: Autor : Libro : Categoria(opcional) : Frase")
         return
 
     if len(partes) >= 2:
         autor = partes[0].strip()
-        frase = partes[1].strip()
-        libro = partes[2].strip() if len(partes) > 2 else "Fragmentos"
-        categoria = partes[3].strip() if len(partes) > 3 else "General"
+        libro = partes[1].strip() if len(partes) > 2 else "Fragmentos"
+        categoria = partes[2].strip() if len(partes) > 3 else "General"
+        frase = partes[3].strip()
         
         try:
-            conn = psycopg2.connect(DB_URL)
-            cur = conn.cursor()
             
-            # Manejamos la inserción de autor
-            cur.execute("SELECT id FROM autores WHERE nombre ILIKE %s", (autor,))
-            resultado_autor = cur.fetchone()
-            if resultado_autor:
-                autor_id = resultado_autor[0]
-            else:
-                cur.execute("INSERT INTO autores (nombre) VALUES (%s) RETURNING id;", (autor,))
+            with psycopg2.connect(DB_URL) as conn:
+                cur = conn.cursor()
+                
+                # Manejamos la inserción de autor
+                cur.execute("INSERT INTO autores (nombre) VALUES (%s) " \
+                "ON CONFLICT (nombre) " \
+                "DO UPDATE SET nombre=EXCLUDED.nombre RETURNING id;", (autor,))
                 autor_id = cur.fetchone()[0]
-            cur.execute("SELECT id FROM categorias WHERE categoria ILIKE %s", (categoria,))
-            resultado_categoria = cur.fetchone()
-            # Manejamos la inserción de categoría
-            if resultado_categoria:
-                categoria_id = resultado_categoria[0]
-            else:
-                cur.execute("INSERT INTO categorias (categoria) VALUES (%s) RETURNING id;", (categoria,))
+
+                # Manejamos la insercion de libro
+                cur.execute("INSERT INTO libros (titulo) VALUES (%s) " \
+                "ON CONFLICT (titulo) " \
+                "DO UPDATE SET titulo=EXCLUDED.titulo RETURNING id;", (libro,))
+                libro_id = cur.fetchone()[0]
+
+                # Manejamos la inserción de categoría
+                cur.execute("INSERT INTO categorias (categoria) VALUES (%s)" \
+                "ON CONFLICT (categoria)" \
+                "DO UPDATE SET categoria=EXCLUDED.categoria RETURNING id;", (categoria,))
                 categoria_id = cur.fetchone()[0]
-            # Opción más segura: especificar dónde está el conflicto
-            cur.execute("""
-                INSERT INTO autor_categorias (autor_id, categoria_id) 
-                VALUES (%s, %s) 
-                ON CONFLICT (autor_id, categoria_id) DO NOTHING;
-            """, (autor_id, categoria_id))
-            # Finalmente, insertamos la frase
-            cur.execute("INSERT INTO frases (autor_id, frase, libro, publicado) VALUES (%s, %s, %s, %s);", (autor_id, frase, libro, False))
-            conn.commit()
-            cur.close()
-            conn.close()
-            await update.message.reply_text(f"✅ Guardado: {frase} - {autor}")
+                
+                # Opción más segura: especificar dónde está el conflicto
+                cur.execute("""
+                    INSERT INTO autor_categorias (autor_id, categoria_id) 
+                    VALUES (%s, %s) 
+                    ON CONFLICT (autor_id, categoria_id) DO NOTHING;
+                """, (autor_id, categoria_id))
+                
+                # Finalmente, insertamos la frase
+                cur.execute("INSERT INTO frases (autor_id, frase, libro_id, publicado) VALUES (%s, %s, %s, %s);", (autor_id, frase, libro_id, False))
+                conn.commit()
+                await update.message.reply_text(f"✅ Guardado: {frase} - {autor}")
         except Exception as e:
             await update.message.reply_text(f"❌ Error al guardar en la base de datos: {e}")
 
