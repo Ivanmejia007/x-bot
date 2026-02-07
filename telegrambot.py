@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update:Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ID:
         await update.message.reply_text("❌ No tienes permiso para usar este bot.")
@@ -30,7 +30,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text="👋 ¡Hola! Envía frases en el formato:\n\n Autor : Libro(opcional) : Categoria(opcional) : Frase"
     )
 
-async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def manejar_mensaje(update:Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ID:
         await update.message.reply_text("❌ No tienes permiso para usar este bot.")
@@ -81,8 +81,8 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # Manejamos la inserción de categoría
             cur.execute("""
-                INSERT INTO categorias (nombre) VALUES (%s) 
-                ON CONFLICT (nombre) DO UPDATE SET nombre=EXCLUDED.nombre 
+                INSERT INTO categorias (categoria) VALUES (%s) 
+                ON CONFLICT (categoria) DO UPDATE SET categoria=EXCLUDED.categoria 
                 RETURNING id;
             """, (categoria,))
 
@@ -100,7 +100,7 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 INSERT INTO frases (autor_id, libro_id, frase, publicado) 
                 VALUES (%s, %s, %s, FALSE);
             """, (autor_id, libro_id, frase))
-            
+
             await update.message.reply_text(f"✅ Guardado: {frase} - {autor}")
     except Exception as e:
         await update.message.reply_text(f"❌ Error al guardar en la base de datos: {e}")
