@@ -12,6 +12,3 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 5. Copiamos el resto de tu código (tu script .py y el .env)
 COPY . .
-
-# 6. Comando para ejecutar tu bot
-CMD ["python", "tu_script_principal.py"]

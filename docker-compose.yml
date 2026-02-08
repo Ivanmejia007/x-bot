@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # --- Servicio 1: Base de Datos ---
   db:
     image: postgres:15
     restart: always
@@ -13,9 +14,28 @@ services:
     volumes:
       - ./postgres_data:/var/lib/postgresql/data
 
-  bot:
+  # --- Servicio 2: Bot de Telegram (El Recolector) ---
+  telegram-bot:
     build: .
+    command: python telegrambot.py  # <--- Aquí le decimos que corra este script
+    restart: always
     depends_on:
       - db
     env_file:
       - .env
+    environment:
+      # Sobrescribimos la DB_URL para que apunte al contenedor 'db'
+      # Formato: postgres://usuario:password@NOMBRE_SERVICIO:puerto/nombre_db
+      - DB_URL=postgresql://practicante:1185@db:5432/bpdb
+
+  # --- Servicio 3: Bot de Twitter (El Publicador) ---
+  twitter-bot:
+    build: .
+    command: python bot_db.py     # <--- Y aquí le decimos que corra el otro
+    restart: always
+    depends_on:
+      - db
+    env_file:
+      - .env
+    environment:
+      - DB_URL=postgresql://practicante:1185@db:5432/bpdb
