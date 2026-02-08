@@ -1,5 +1,3 @@
-# Este script ya no jalo porque modifique la base de datos con nuevas reglas para que verifique no distinga mayus y minus ni acentos
-# para evitar duplicados
 from dotenv import load_dotenv
 import logging
 import psycopg2
