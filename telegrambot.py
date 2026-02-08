@@ -1,3 +1,5 @@
+# Este script ya no jalo porque modifique la base de datos con nuevas reglas para que verifique no distinga mayus y minus ni acentos
+# para evitar duplicados
 from dotenv import load_dotenv
 import logging
 import psycopg2
@@ -61,7 +63,7 @@ async def manejar_mensaje(update:Update, context: ContextTypes.DEFAULT_TYPE):
         with psycopg2.connect(DB_URL) as conn:
             cur = conn.cursor()
             
-            # Manejamos la inserción de autor
+            # Manejamos la inserción de autor 
             cur.execute(""" 
                 INSERT INTO autores (nombre) VALUES (%s)
                 ON CONFLICT (nombre)
