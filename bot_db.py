@@ -96,7 +96,10 @@ def publicar_frase():
         id_frase, frase, autor, libro, categoria_id = frase_data
         libro_display = libro if libro else "Fragmentos"
         remate = obtener_remate(categoria_id)
-        tweet_content = f'"{frase}", {remate}\n\n- {autor}, {libro_display}'
+        frase_limpia = frase.strip()
+        if frase_limpia.endswith('.'):
+            frase_limpia = frase_limpia[:-1]
+        tweet_content = f'"{frase_limpia}", {remate}\n\n- {autor}, {libro_display}'
         # --- VALIDACIÓN DE LONGITUD ---
         if len(tweet_content) > 280:
             print(f"⚠️ Tweet demasiado largo ({len(tweet_content)} caracteres). Saltando...")
