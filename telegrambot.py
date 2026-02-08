@@ -5,8 +5,8 @@ import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
-# print(telegram.__version__)
-# Lógica simple: Recibe mensaje -> Separa por "|" -> INSERT en DB
+# Lógica simple: Recibe mensaje -> Separa por ":" -> INSERT en DB
+
 
 load_dotenv()
 TOKEN = os.getenv('TTOKEN')
@@ -27,89 +27,129 @@ async def start(update:Update, context: ContextTypes.DEFAULT_TYPE):
     
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text="👋 ¡Hola! Envía frases en el formato:\n\n Autor : Libro(opcional) : Categoria(opcional) : Frase"
+        text="👋 ¡Hola! Envía frases en el formato:\n\n Autor : Libro(opcional) : " \
+        "Categoria(opcional) : Frase"
     )
 
-async def manejar_mensaje(update:Update, context: ContextTypes.DEFAULT_TYPE):
+async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ID:
         await update.message.reply_text("❌ No tienes permiso para usar este bot.")
         return
     
     texto = update.message.text
-    partes = [p.strip() for p in texto.split(':',3) if p.strip()]
-    if len(partes) < 2: 
-        await update.message.reply_text("⚠️ Formato incorrecto. Usa: Autor : Libro(opcional) : Categoria(opcional) : Frase")
-        return
+    # Split inteligente (máximo 3 cortes para permitir dos puntos en la frase)
+    partes = [p.strip() for p in texto.split(':', 3) if p.strip()]
 
-    # logica para manejar distintos tipos de mensajes 
     if len(partes) == 4:
-        autor, libro, categoria, frase = partes
+        autor_input, libro_input, categoria_input, frase = partes
     elif len(partes) == 3:
-        autor, libro, frase = partes
-        categoria = "General"
+        autor_input, libro_input, frase = partes
+        categoria_input = "General"
     elif len(partes) == 2:
-        autor, frase = partes
-        libro = "Fragmentos"
-        categoria = "General"
+        autor_input, frase = partes
+        libro_input = "Fragmentos"
+        categoria_input = "General"
     else:
-        await update.message.reply_text("⚠️ Formato: Autor : Libro : Categoria : Frase")
+        await update.message.reply_text("⚠️ Formato incorrecto. Usa: Autor" \
+        " : Libro : Categoria : Frase")
         return
 
     try:
         with psycopg2.connect(DB_URL) as conn:
-            with conn.cursor() as cur: # Usamos 'with' para el cursor también
+            with conn.cursor() as cur:
                 
-                # --- 1. MANEJO DEL AUTOR ---
-                # Buscamos usando tu función mágica 'f_unaccent' para ser tolerantes a fallos
+                # --- 1. BUSCAR AUTOR (Modo Inteligente) ---
+                # Buscamos si algo en la BD se parece a lo que escribiste
                 cur.execute("""
-                    SELECT id FROM autores 
-                    WHERE lower(f_unaccent(nombre)) = lower(f_unaccent(%s));
-                """, (autor,))
+                    SELECT id, nombre FROM autores 
+                    WHERE lower(f_unaccent(nombre)) 
+                    LIKE lower(f_unaccent(%s))
+                    LIMIT 1;
+                """, (f"%{autor_input}%",)) # Agregamos % para buscar coincidencias parciales
+                
                 res = cur.fetchone()
 
                 if res:
-                    autor_id = res[0] # Ya existía, usamos su ID
+                    autor_id, nombre_real = res
+                    # Opcional: Avisar si corrigió el nombre
+                    if nombre_real.lower() != autor_input.lower():
+                        print(f"🤓 Auto-corrección: '{autor_input}' -> '{nombre_real}'")
                 else:
-                    # No existe, lo creamos
-                    cur.execute("INSERT INTO autores (nombre) " \
-                    "VALUES (%s) RETURNING id;", (autor,))
+                    # Si no encuentra nada parecido, crea uno nuevo
+                    cur.execute("INSERT INTO autores (nombre) VALUES (%s) RETURNING id;",
+                    (autor_input,))
                     autor_id = cur.fetchone()[0]
 
-                # --- 2. MANEJO DEL LIBRO ---
-                # Buscamos el libro que coincida en Título Y Autor
+                cats_obligatorias = ["General", "clasico"] 
+                
+                for cat_nombre in cats_obligatorias:
+                    # A. Buscamos el ID de la categoría 
+                    # (por si acaso cambia el ID en el futuro)
+                    cur.execute("SELECT id FROM categorias " \
+                    "WHERE lower(categoria) = lower(%s)",
+                    (cat_nombre,))
+                    cat_res = cur.fetchone()
+                    
+                    if cat_res:
+                        cat_obligatoria_id = cat_res[0]
+                    else:
+                        # Si por alguna razón borraste 'General', la crea de nuevo
+                        cur.execute("INSERT INTO categorias (categoria) " \
+                        "VALUES (%s) RETURNING id",
+                        (cat_nombre,))
+                        cat_obligatoria_id = cur.fetchone()[0]
+                    
+                    # B. La vinculamos al autor (Si ya la tiene, no hace nada)
+                    cur.execute("""
+                        INSERT INTO autor_categorias (autor_id, categoria_id) 
+                        VALUES (%s, %s) 
+                        ON CONFLICT (autor_id, categoria_id) DO NOTHING;
+                    """, (autor_id, cat_obligatoria_id))
+                
+                # --- 2. BUSCAR LIBRO (Modo Inteligente) ---
                 cur.execute("""
-                    SELECT id FROM libros 
-                    WHERE lower(f_unaccent(titulo)) = lower(f_unaccent(%s)) 
-                    AND autor_id = %s;
-                """, (libro, autor_id))
+                    SELECT id, titulo FROM libros 
+                    WHERE lower(f_unaccent(titulo)) LIKE lower(f_unaccent(%s)) 
+                    AND autor_id = %s
+                    LIMIT 1;
+                """, (f"%{libro_input}%", autor_id))
+                
                 res = cur.fetchone()
 
                 if res:
-                    libro_id = res[0]
+                    libro_id, titulo_real = res
                 else:
-                    cur.execute("INSERT INTO libros (titulo, autor_id) " \
-                    "VALUES (%s, %s) RETURNING id;", (libro, autor_id))
+                    cur.execute("INSERT INTO libros (titulo, autor_id) VALUES (%s, %s) RETURNING id;",
+                    (libro_input, autor_id))
                     libro_id = cur.fetchone()[0]
 
-                # --- 3. MANEJO DE CATEGORÍA ---
-                # Aquí asumimos que categorias sigue teniendo un constraint simple, 
-                # pero usamos la misma lógica segura por si acaso.
-                cur.execute("SELECT id FROM categorias WHERE categoria = %s;", (categoria,))
+                # --- 3. BUSCAR CATEGORÍA (Modo Inteligente) ---
+                # Esto ayuda con 'existencialista' -> 'Existencialismo'
+                # OJO: Solo funciona si la palabra input está CONTENIDA
+                # en la de la base de datos
+                # Ej: Input "Existencial" encuentra "Existencialismo". 
+                # Input "Existencialista" NO encuentra 
+                # "Existencialismo" (porque sobra 'ista').
+                # Truco: Escribe la raíz de la palabra.
+                cur.execute("""
+                    SELECT id, categoria FROM categorias 
+                    WHERE lower(f_unaccent(categoria)) LIKE lower(f_unaccent(%s))
+                    LIMIT 1;
+                """, (f"%{categoria_input}%",))
+                
                 res = cur.fetchone()
 
                 if res:
-                    categoria_id = res[0]
+                    categoria_id, cat_real = res
                 else:
-                    # Usamos ON CONFLICT aquí por si acaso la tabla categorias es simple
-                    # Si falla, puedes cambiarlo al estilo SELECT/INSERT como arriba
+                    # Si no existe, la creamos (con protección de conflicto por si acaso)
                     cur.execute("""
-                        INSERT INTO categorias (categoria) 
-                        VALUES (%s) 
-                        ON CONFLICT (categoria) 
+                        INSERT INTO categorias (categoria) VALUES (%s) 
+                        ON CONFLICT (lower(f_unaccent(categoria))) 
                         DO UPDATE SET categoria=EXCLUDED.categoria 
                         RETURNING id;
-                    """, (categoria,))
+                    """, (categoria_input,))
                     categoria_id = cur.fetchone()[0]
                 
                 # --- 4. RELACIÓN AUTOR-CATEGORÍA ---
@@ -119,27 +159,31 @@ async def manejar_mensaje(update:Update, context: ContextTypes.DEFAULT_TYPE):
                     ON CONFLICT (autor_id, categoria_id) DO NOTHING;
                 """, (autor_id, categoria_id))
                 
-                # --- 5. INSERTAR LA FRASE (Lógica Pro) ---
+                # --- 5. INSERTAR FRASE ---
                 cur.execute("""
                     INSERT INTO frases (autor_id, libro_id, frase, publicado) 
                     VALUES (%s, %s, %s, FALSE)
                     ON CONFLICT (lower(f_unaccent(frase))) DO NOTHING;
                 """, (autor_id, libro_id, frase))
-                
-                # Verificamos qué pasó
                 filas_afectadas = cur.rowcount 
 
                 if filas_afectadas > 0:
-                    await update.message.reply_text(f"✅ Guardado: {frase[:30]}... - {autor}")
+                    # Mensaje más informativo
+                    autor_display = nombre_real if 'nombre_real' in locals() else autor_input
+                    libro_display = titulo_real if 'titulo_real' in locals() else libro_input
+                    respuesta = f"✅ Guardado bajo:\n👤 {autor_display}\n📖 {libro_display}\n💬 {frase}"
+                    await update.message.reply_text(respuesta)
                 else:
-                    # Si rowcount es 0, significa que el DO NOTHING entró en acción
-                    await update.message.reply_text(f"👀 Ojo: Esa frase de {autor} ya existía en la base de datos.")
-                    await update.message.reply_text(f"✅ Guardado: {frase[:30]}... - {autor}")
+                    await update.message.reply_text(f"👀 Esa frase ya existía.")
+    
     except psycopg2.Error as e:
-        # Capturamos errores específicos de base de datos
-        await update.message.reply_text(f"❌ Error de Base de Datos: {e.pgerror}")
+    
+        await update.message.reply_text(f"❌ Error DB: {e.pgerror}")
     except Exception as e:
-        await update.message.reply_text(f"❌ Error general: {e}")
+        await update.message.reply_text(f"❌ Error: {e}")
+
+
+
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
     
