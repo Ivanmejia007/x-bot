@@ -59,54 +59,89 @@ async def manejar_mensaje(update:Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        
         with psycopg2.connect(DB_URL) as conn:
-            cur = conn.cursor()
-            
-            # Manejamos la inserción de autor 
-            cur.execute(""" 
-                INSERT INTO autores (nombre) VALUES (%s)
-                ON CONFLICT (nombre)
-                DO UPDATE SET nombre=EXCLUDED.nombre RETURNING id;
-            """, (autor,))
-            
-            autor_id = cur.fetchone()[0]
+            with conn.cursor() as cur: # Usamos 'with' para el cursor también
+                
+                # --- 1. MANEJO DEL AUTOR ---
+                # Buscamos usando tu función mágica 'f_unaccent' para ser tolerantes a fallos
+                cur.execute("""
+                    SELECT id FROM autores 
+                    WHERE lower(f_unaccent(nombre)) = lower(f_unaccent(%s));
+                """, (autor,))
+                res = cur.fetchone()
 
-            # Manejamos la insercion de libro
-            cur.execute("""
-                INSERT INTO libros (titulo, autor_id) VALUES (%s, %s) 
-                ON CONFLICT (titulo) DO UPDATE SET titulo=EXCLUDED.titulo 
-                RETURNING id;
-            """, (libro, autor_id))
-            
-            libro_id = cur.fetchone()[0]
+                if res:
+                    autor_id = res[0] # Ya existía, usamos su ID
+                else:
+                    # No existe, lo creamos
+                    cur.execute("INSERT INTO autores (nombre) " \
+                    "VALUES (%s) RETURNING id;", (autor,))
+                    autor_id = cur.fetchone()[0]
 
-            # Manejamos la inserción de categoría
-            cur.execute("""
-                INSERT INTO categorias (categoria) VALUES (%s) 
-                ON CONFLICT (categoria) DO UPDATE SET categoria=EXCLUDED.categoria 
-                RETURNING id;
-            """, (categoria,))
+                # --- 2. MANEJO DEL LIBRO ---
+                # Buscamos el libro que coincida en Título Y Autor
+                cur.execute("""
+                    SELECT id FROM libros 
+                    WHERE lower(f_unaccent(titulo)) = lower(f_unaccent(%s)) 
+                    AND autor_id = %s;
+                """, (libro, autor_id))
+                res = cur.fetchone()
 
-            categoria_id = cur.fetchone()[0]
-            
-            # Opción más segura: especificar dónde está el conflicto
-            cur.execute("""
-                INSERT INTO autor_categorias (autor_id, categoria_id) 
-                VALUES (%s, %s) 
-                ON CONFLICT (autor_id, categoria_id) DO NOTHING;
-            """, (autor_id, categoria_id))
-            
-            # Finalmente, insertamos la frase
+                if res:
+                    libro_id = res[0]
+                else:
+                    cur.execute("INSERT INTO libros (titulo, autor_id) " \
+                    "VALUES (%s, %s) RETURNING id;", (libro, autor_id))
+                    libro_id = cur.fetchone()[0]
+
+                # --- 3. MANEJO DE CATEGORÍA ---
+                # Aquí asumimos que categorias sigue teniendo un constraint simple, 
+                # pero usamos la misma lógica segura por si acaso.
+                cur.execute("SELECT id FROM categorias WHERE categoria = %s;", (categoria,))
+                res = cur.fetchone()
+
+                if res:
+                    categoria_id = res[0]
+                else:
+                    # Usamos ON CONFLICT aquí por si acaso la tabla categorias es simple
+                    # Si falla, puedes cambiarlo al estilo SELECT/INSERT como arriba
+                    cur.execute("""
+                        INSERT INTO categorias (categoria) 
+                        VALUES (%s) 
+                        ON CONFLICT (categoria) 
+                        DO UPDATE SET categoria=EXCLUDED.categoria 
+                        RETURNING id;
+                    """, (categoria,))
+                    categoria_id = cur.fetchone()[0]
+                
+                # --- 4. RELACIÓN AUTOR-CATEGORÍA ---
+                cur.execute("""
+                    INSERT INTO autor_categorias (autor_id, categoria_id) 
+                    VALUES (%s, %s) 
+                    ON CONFLICT (autor_id, categoria_id) DO NOTHING;
+                """, (autor_id, categoria_id))
+                
+                # --- 5. INSERTAR LA FRASE (Lógica Pro) ---
             cur.execute("""
                 INSERT INTO frases (autor_id, libro_id, frase, publicado) 
-                VALUES (%s, %s, %s, FALSE);
+                VALUES (%s, %s, %s, FALSE)
+                ON CONFLICT (lower(f_unaccent(frase))) DO NOTHING;
             """, (autor_id, libro_id, frase))
+            
+            # Verificamos qué pasó
+            filas_afectadas = cur.rowcount 
 
-            await update.message.reply_text(f"✅ Guardado: {frase} - {autor}")
+            if filas_afectadas > 0:
+                await update.message.reply_text(f"✅ Guardado: {frase[:30]}... - {autor}")
+            else:
+                # Si rowcount es 0, significa que el DO NOTHING entró en acción
+                await update.message.reply_text(f"👀 Ojo: Esa frase de {autor} ya existía en la base de datos.")
+                await update.message.reply_text(f"✅ Guardado: {frase[:30]}... - {autor}")
+    except psycopg2.Error as e:
+        # Capturamos errores específicos de base de datos
+        await update.message.reply_text(f"❌ Error de Base de Datos: {e.pgerror}")
     except Exception as e:
-        await update.message.reply_text(f"❌ Error al guardar en la base de datos: {e}")
-
+        await update.message.reply_text(f"❌ Error general: {e}")
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
     
