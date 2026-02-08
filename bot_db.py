@@ -40,15 +40,38 @@ def obtener_frase_db():
         return None
 
 def obtener_remate(categoria_id):
-    conn = psycopg2.connect(DB_URL)
-    cur = conn.cursor()
-    # Lógica de categorías según el autor
-    query = "SELECT texto FROM remates WHERE categoria_id = %s ORDER BY RANDOM() LIMIT 1;"
-    cur.execute(query, (categoria_id,))
-    res = cur.fetchone()
-    conn.close()
+    """
+    Busca un remate específico. 
+    Si la categoría está vacía, usa los remates de 'General' (ID 5) como respaldo.
+    """
+    if not categoria_id:
+        # Si no tiene categoría, vamos directo al Plan B (General)
+        categoria_id = 5
+        
+    try:
+        with psycopg2.connect(DB_URL) as conn:
+            with conn.cursor() as cur:
+                # --- PLAN A: Buscar remate específico de la categoría ---
+                query = "SELECT texto FROM remates WHERE categoria_id = %s ORDER BY RANDOM() LIMIT 1;"
+                cur.execute(query, (categoria_id,))
+                res = cur.fetchone()
+                
+                if res:
+                    return res[0] # ¡Éxito! Tenemos remate personalizado.
+                
+                # --- PLAN B (Fallback): Usar remates de 'General' (ID 5) ---
+                # Si el Plan A falló y no estamos ya buscando en General...
+                if categoria_id != 5:
+                    print(f"⚠️ La categoría {categoria_id} no tiene remates. Usando 'General'.")
+                    cur.execute("SELECT texto FROM remates WHERE categoria_id = 5 ORDER BY RANDOM() LIMIT 1;")
+                    res_general = cur.fetchone()
+                    return res_general[0] if res_general else None
+                    
+                return None
+    except Exception as e:
+        print(f"⚠️ Error al obtener remate: {e}")
+        return None
     
-    return res[0] if res else "Facts."
 
 def marcar_frase_como_publicada_db(id_frase):
     try:
