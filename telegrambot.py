@@ -37,7 +37,7 @@ async def manejar_mensaje(update:Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     texto = update.message.text
-    partes = [p.strip() for p in texto.split(':') if p.strip()]
+    partes = [p.strip() for p in texto.split(':',3) if p.strip()]
     if len(partes) < 2: 
         await update.message.reply_text("⚠️ Formato incorrecto. Usa: Autor : Libro(opcional) : Categoria(opcional) : Frase")
         return
@@ -120,21 +120,21 @@ async def manejar_mensaje(update:Update, context: ContextTypes.DEFAULT_TYPE):
                 """, (autor_id, categoria_id))
                 
                 # --- 5. INSERTAR LA FRASE (Lógica Pro) ---
-            cur.execute("""
-                INSERT INTO frases (autor_id, libro_id, frase, publicado) 
-                VALUES (%s, %s, %s, FALSE)
-                ON CONFLICT (lower(f_unaccent(frase))) DO NOTHING;
-            """, (autor_id, libro_id, frase))
-            
-            # Verificamos qué pasó
-            filas_afectadas = cur.rowcount 
+                cur.execute("""
+                    INSERT INTO frases (autor_id, libro_id, frase, publicado) 
+                    VALUES (%s, %s, %s, FALSE)
+                    ON CONFLICT (lower(f_unaccent(frase))) DO NOTHING;
+                """, (autor_id, libro_id, frase))
+                
+                # Verificamos qué pasó
+                filas_afectadas = cur.rowcount 
 
-            if filas_afectadas > 0:
-                await update.message.reply_text(f"✅ Guardado: {frase[:30]}... - {autor}")
-            else:
-                # Si rowcount es 0, significa que el DO NOTHING entró en acción
-                await update.message.reply_text(f"👀 Ojo: Esa frase de {autor} ya existía en la base de datos.")
-                await update.message.reply_text(f"✅ Guardado: {frase[:30]}... - {autor}")
+                if filas_afectadas > 0:
+                    await update.message.reply_text(f"✅ Guardado: {frase[:30]}... - {autor}")
+                else:
+                    # Si rowcount es 0, significa que el DO NOTHING entró en acción
+                    await update.message.reply_text(f"👀 Ojo: Esa frase de {autor} ya existía en la base de datos.")
+                    await update.message.reply_text(f"✅ Guardado: {frase[:30]}... - {autor}")
     except psycopg2.Error as e:
         # Capturamos errores específicos de base de datos
         await update.message.reply_text(f"❌ Error de Base de Datos: {e.pgerror}")
